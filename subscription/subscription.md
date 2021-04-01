@@ -1,0 +1,1184 @@
+# Table of Contents
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+  - [A bit of blabbering](#a-bit-of-blabbering)
+    - [Fitting with your marketplace](#fitting-with-your-marketplace)
+    - [Foreseen problem](#foreseen-problem)
+  - [Preparation](#preparation)
+    - [Note](#note)
+    - [Stripe](#stripe)
+      - [Some concepts about Stripe](#some-concepts-about-stripe)
+  - [Overall solution](#overall-solution)
+- [Recipes](#recipes)
+  - [Composing promises](#composing-promises)
+  - [Creating Stripe product](#creating-stripe-product)
+    - [Get listing data](#get-listing-data)
+    - [Create product params](#create-product-params)
+  - [Init subscription](#init-subscription)
+    - [User2Admin](#user2admin)
+      - [Incoming Params](#incoming-params)
+    - [Customer2Provider](#customer2provider)
+      - [Incoming Params](#incoming-params-1)
+    - [Fetching users data](#fetching-users-data)
+      - [Common fetch users data used by both provider and customer](#common-fetch-users-data-used-by-both-provider-and-customer)
+      - [Customer](#customer)
+        - [Finding Stripe customer on Stripe](#finding-stripe-customer-on-stripe)
+      - [Provider](#provider)
+    - [Checking requirement](#checking-requirement)
+      - [User2Admin](#user2admin-1)
+      - [Provider2Customer](#provider2customer)
+    - [Talk to Stripe](#talk-to-stripe)
+      - [Map input params to Stripe params](#map-input-params-to-stripe-params)
+        - [Common function to map our line items to Stripe's line items](#common-function-to-map-our-line-items-to-stripes-line-items)
+        - [User2Admin](#user2admin-2)
+        - [Customer2Provider](#customer2provider-1)
+    - [Normalise returned subscription data](#normalise-returned-subscription-data)
+  - [Update subscription](#update-subscription)
+    - [Common logic](#common-logic)
+    - [Incoming params](#incoming-params-2)
+    - [Updating subscription in Stripe](#updating-subscription-in-stripe)
+      - [Creating params](#creating-params)
+      - [Creating updated items](#creating-updated-items)
+  - [Integrating with template](#integrating-with-template)
+    - [Create sdk instance point to our server](#create-sdk-instance-point-to-our-server)
+    - [Initiate subscription call](#initiate-subscription-call)
+      - [Saving customer credit card first](#saving-customer-credit-card-first)
+  - [Respond to Flex event](#respond-to-flex-event)
+  - [Respond to Stripe event](#respond-to-stripe-event)
+  - [Payout](#payout)
+  - [Utility](#utility)
+    - [Object to to camel case](#object-to-to-camel-case)
+    - [Create ST Flex error object](#create-st-flex-error-object)
+    - [Initiate Stripe instance](#initiate-stripe-instance)
+
+
+# Introduction
+
+TLDR; 
+> Subscription is hard, hence the cookbook.
+
+---
+
+Online marketplaces has evolved tremendously over the years. With Sharetribe Flex's help it is even easier to setup your marketplace. But due to COVID-19, marketplaces is gaining lots of attention. As as result, ideas for creating marketplace has become incredibly diverse.
+
+Membership fees for seeing exclusive market contents, subscription fees for layering the market's service or long-term rental between the provider and customer,...the list is getting longer by day. Subscription has become a key to add multitude of flavour to the marketplace. While Sharetribe Flex already offers a lot, the team can't satisfy everyone's need.
+
+That's why the Journey Horizon team decided to help out and write this cookbook. This will hold the recipes for you to cook the subscription services to your liking when you are using Sharetribe Flex.
+
+## A bit of blabbering
+
+Before begin, first, let's answer these 2 important questions:
+- Would our solution be MR.right?
+- What's the catch? 
+
+Being able to know these answers before might save you lots of time and effort so please be patient and stick with me here.
+
+### Fitting with your marketplace
+
+Let's consider these aspects to see if it's a right fit for you:
+  
+1) **Development Effort**: yes, you would need a developer to connect the dot. 
+2) **Capability**: Admin2Customer, Admin2Provider, Customer2Provider.
+3) **Supported countries**: Depends - Right now the guide is using Stripe so what Stripe support, your site can also have it.
+4) **Supported payment method**: Saved credit cards. For ACH and other type of payment, Stripe also supports it but would need further implementation.
+5) **Payment compliance**: we would use Stripe & ST Flex built-in mechanism.
+6) **Languages**: Javascript
+7) **Required experience**: Should be familiar with Flex and some simple concept of Stripe (Which we would be covering some essential part here)
+
+### Foreseen problem
+
+- The solution would heavily depends on using ST Flex's template and Stripe so if either of them has big changes, this guide could become obsolete.
+
+- Stripe's subscription is still in the beta state. You would need to email them to get access to the beta program. But because of that, the APIs would be subject to changes in the future.
+
+## Preparation
+
+
+### Note
+
+To help you understand the argument definition better, these recipes would use ST Flex template's way of declaring default props for declaring incoming params. In actual implement, it could be different.
+
+### Stripe
+
+- Supported version: from `2020-08-27` and above
+- Email to Stripe and ask to join beta problem for using `on_behalf_of` for subscription
+
+#### Some concepts about Stripe
+
+- **Stripe pricing Id**: So for `User2Admin` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
+- **Product**: This is a Stripe concept. It's meaning would be similar to the listing on your marketplace
+
+## Overall solution
+
+We are using:
+- ST Flex template
+- A server (you can use ST Flex's built in or use a light-weight ExpressJS server, or even a Deno server if you are a fan of experimenting new languages)
+- Stripe webhooks (for you to respond to what happen if subscription end/start,...etc)
+
+# Recipes
+
+## Composing promises
+
+From now on, the example codes would heavily used the following concept:
+-  `Curry function` - You can read more about it [here](https://medium.com/javascript-scene/curry-and-function-composition-2c208d774983)
+-  Function called `composePromises`. The purposes is to create a easy to read promise chain where the output of the current function would be the input of the next one.
+
+Here is a simple implementation of `composePromises`, there are far more better way of achieving it, so this is not the only way to compose promises:
+
+```js
+const composeMRight = method => (...ms) => (
+  ms.reduceRight((f, g) => x => g(x)[method](f))
+);
+//This one is used to inject your own logic onto the current execution
+//Result of the previous function is the args of the current function
+export const composePromises = composeMRight('then');
+```
+
+## Creating Stripe product
+
+So you would only need to create a Stripe product if you want to create a subscription to a listing which usually belongs to the provider. There are multiple places where you can create a product:
+- At the point of listing creation - use ST Flex's event and detect if there are any listing creation event, then we sync with Stripe
+- At the point of initiating subscription - this helps reduce duplication of data if on your marketplace there might be only a portion of listings that would offer subscription
+- Manually using Stripe dashboard - usually for `User2Admin` case where the product is actually the marketplace's service and does not tight to any listing.
+
+```js
+export const createStripeProduct = listingId => {
+   return composePromises(
+    getListingData,
+    createProductParams,
+    //You would need to init a Stripe instance somewhere and import it
+    stripe.products.create,
+  )({ listingId: id, include: ['author'] });
+}
+```
+### Get listing data
+
+```js
+export const getListingData = ({ id, include = ['author'] }) =>
+  integrationSdk.listings.show({
+    id,
+    include,
+  }).then(response => {
+    const entities = denormalisedResponseEntities(response);
+    if (entities.length !== 1) {
+      throw new Error('Expected a resource in the integrationSdk.listings.show response');
+    }
+    return entities[0];
+  });
+```
+### Create product params
+
+```js
+const createProductParams = async (listing) => {
+  //TODO: Add more needed attributes to this place
+  return {
+    id: listing.id.uuid,
+    name: listing.attributes.title,
+  }
+}
+```
+## Init subscription
+
+Here is a simple flow chart of what we would do:
+
+![init-subscription-flow](./init-subscription-flow.png "init-subscription-flow")
+
+I will not go deeper in the `authentication` aspect and only focus on how would we interact with our server & Stripe here. So assuming we have already verified the incoming request -  meaning it's from a trusted source.
+
+### User2Admin
+When it's subscription `User2Admin`:
+```js
+const { customerId } = fnParams;
+
+const initSubscription = composePromises(
+      fetchCustomer,
+      checkRequirement,
+      initSubscription(fnParams),
+      normaliseSubscriptionData,
+      //Adding extra steps to modify ST Flex user data if needed
+    )(customerId);
+```
+
+#### Incoming Params
+
+A note here is that the `customerId` is the ST Flex UUID of the customer. We would need it to fetch more detailed about the customer's data which usually includes saved credit cards, data from Stripe that belongs to that customer.
+
+`fnParams` for `User2Admin`
+```js
+const fnParams = {
+  customerId: uuid.isRequired,
+  params: shape({
+    protectedData: object,
+    lineItems: arrayOf(shape({
+      //Price id of the subscription plan that you defined in the dashboard
+      pricingId: string.isRequired, 
+      quantity: number.isRequired
+    }))
+  })
+}
+```
+
+A refresher - For admin to user, we can define the subscription plan using the Stripe dashboard and each price would have their own ID. That's why we only need to parse in the price ID and the quantity the user want to subscribe to.
+
+### Customer2Provider
+
+When it's subscription `Customer2Provider`:
+```js
+const { customerId, providerId } = fnParams;
+
+const initSubscription = composePromises(
+    fetchUsersData,
+    checkRequirement,
+    init(fnParams),
+    normaliseSubscriptionData,
+    //Adding extra steps to modify ST Flex user data if needed
+  )({
+    customerId,
+    providerId
+  })
+```
+
+#### Incoming Params
+
+A note here is that the `customerId` and `providerId` is the ST Flex UUID of the customer and the provider. We would need it to fetch more detailed about the customer's data and also need to check if the provider has already connected to Stripe or not.
+
+`fnParams` for `Customer2Provider`
+```js
+const fnParams = {
+  customerId: uuid.isRequired,
+  providerId: uuid.isRequired,
+  params: shape({
+    bookingStartTime: number,
+    bookingEndTime: number,
+    commissionPercentage: number,
+    protectedData: object,
+    lineItems: arrayOf(shape({
+      pricingId: string,
+      quantity: number.isRequired,
+      priceData: shape({
+        //You need to create a Stripe product first to use this
+        listingId: uuid.isRequired,
+        interval: shape({
+          period: oneOf(['day', 'week', 'month', 'year']).isRequired,
+          count: number.isRequired
+        }),
+        price: shape({
+          amount: number.isRequired,
+          currency: string.isRequired
+        })
+      })
+    }))
+  })
+}
+```
+
+### Fetching users data
+
+So there would be 2 entities for us to fetch, the `customer` and the `provider`, for `Customer2Provider`case, we would create a function to fetch both in parallel, while in the `User2Admin` case, we would only need the `fetchCustomer` function.
+
+
+#### Common fetch users data used by both provider and customer
+
+```js
+export const getUserData = ({ id, include = ['profileImage'] }) =>
+  integrationSdk.users.show({
+    id,
+    include,
+  }).then(response => {
+    const entities = denormalisedResponseEntities(response);
+    if (entities.length !== 1) {
+      throw new Error('Expected a resource in the integrationSdk.users.show response');
+    }
+    return entities[0];
+  });
+```
+#### Customer
+
+There would be 2 types of data we need to fetch:
+- `Data from ST Flex`
+- `Customer data from Stripe`
+
+```js
+const fetchCustomer = async (id) => {
+  return Promise.all([
+    getUserData({ id, include: ['stripeAccount'] }),
+    findStripeCustomer(id)
+  ]).then(([customer, stripeCustomer]) => {
+    customer.stripeCustomer = stripeCustomer;
+    return customer;
+  })
+}
+```
+##### Finding Stripe customer on Stripe
+
+```js
+import pick from "lodash/pick";
+
+const LIMIT = 100;
+const CUSTOMER_ATTRIBUTES_TO_TAKE_FROM_STRIPE = [
+  "id",
+  "subscriptions",
+  "tax_ids",
+  "invoice_settings",
+];
+
+export const findStripeCustomer = async (id, anchor = null) => {
+  const params = {
+    limit: LIMIT,
+  };
+  if (anchor) {
+    params.starting_after = anchor;
+  }
+  const customersRes = await stripe.customers.list(params);
+  const customers = customersRes.data;
+  const customer = customers.find(customer =>
+    customer.metadata['sharetribe-user-id'] === userId);
+
+  if (customer) {
+    return convertObjToCamelCase(pick(customer, CUSTOMER_ATTRIBUTES_TO_TAKE_FROM_STRIPE));
+  }
+
+  if (!customersRes.has_more) {
+    return null;
+  }
+
+  return findStripeCustomer(userId, customers[customers.length - 1].id);
+}
+```
+
+#### Provider
+
+For provider we would also need to fetch the provider's connected account. Luckily, ST Flex integration sdk already give us support for that so the `fetchProvider` function would be much more simple
+
+```js
+export const fetchProvider = async (id) => {
+  return getUserData({ id, include: ['stripeAccount'] });
+}
+```
+
+### Checking requirement
+
+#### User2Admin
+
+We would be using ST Flex template's built in mechanism to save credit card (This one would be cover in another recipes). So our user should already save credit card first before initiating the subscription. We can add up others validation logic here as well.
+
+```js
+const NO_PAYMENT_METHOD_ERROR = 'NO_PAYMENT_METHOD_ERROR';
+
+export const checkSubscriptionRequirement = async (customer) => {
+  const { stripeCustomer } = customer;
+
+  if (!stripeCustomer ||
+    !stripeCustomer.invoiceSettings ||
+    !stripeCustomer.invoiceSettings.defaultPaymentMethod) {
+    throw ({
+      code: 404,
+      data: createFlexErrorObject({
+        status: 404,
+        message: NO_PAYMENT_METHOD_ERROR,
+        messageCode: NO_PAYMENT_METHOD_ERROR
+      })
+    });
+  }
+
+  return customer;
+}
+```
+
+#### Provider2Customer
+
+We would need to check if the customer has credit card and if provider has already connect their account
+
+```js
+const HAVE_NOT_CONNECTED_STRIPE_ACCOUNT = 'HAVE_NOT_CONNECTED_STRIPE_ACCOUNT';
+const NO_PAYMENT_METHOD_ERROR = 'NO_PAYMENT_METHOD_ERROR';
+
+export const checkSubscriptionRequirement = async ({ customer, provider }) => {
+  const { stripeCustomer } = customer;
+
+  if (!stripeCustomer ||
+    !stripeCustomer.invoiceSettings ||
+    !stripeCustomer.invoiceSettings.defaultPaymentMethod) {
+    throw ({
+      code: 404,
+      data: createFlexErrorObject({
+        status: 404,
+        message: NO_PAYMENT_METHOD_ERROR,
+        messageCode: NO_PAYMENT_METHOD_ERROR
+      })
+    });
+  }
+
+  const { stripeAccount } = provider;
+
+  if (!stripeAccount ||
+    !provider.attributes.stripeConnected) {
+    throw ({
+      code: 404,
+      data: createFlexErrorObject({
+        status: 404,
+        message: HAVE_NOT_CONNECTED_STRIPE_ACCOUNT,
+        messageCode: HAVE_NOT_CONNECTED_STRIPE_ACCOUNT
+      })
+    });
+  }
+
+  return {
+    customer,
+    provider
+  };
+}
+
+```
+### Talk to Stripe
+
+So basically depends on which cases we are on, we would receive either 
+```js
+{
+  provider,
+  customer
+}
+```
+or just
+```js
+{
+  customer
+}
+```
+
+If it's `User2Admin`:
+
+```js
+const initSubscription = (fnParams) => async ({
+  customer,
+}) => {
+  return composePromises(
+    createUser2AdminSubscriptionParams,
+    //Calling Stripe directly
+    stripe.subscriptions.create
+  )({
+    fnParams,
+    customer,
+  });
+}
+```
+
+If it's `Customer2Provider`:
+
+```js
+const initSubscription = (fnParams) => async ({
+  customer,
+  provider
+}) => {
+  return composePromises(
+    createCustomer2ProviderSubscriptionParams,
+    //Calling Stripe directly
+    stripe.subscriptions.create
+  )({
+    fnParams,
+    customer,
+    provider
+  });
+}
+```
+
+#### Map input params to Stripe params
+
+##### Common function to map our line items to Stripe's line items
+
+```js
+const WRONG_PARAMS = 'WRONG_PARAMS';
+
+const createItems = lineItems => lineItems.map(({
+  pricingId,
+  priceData,
+  quantity
+}) => {
+  if (pricingId) {
+    return {
+      price: pricingId,
+      quantity
+    }
+  }
+
+  if (priceData) {
+    const {
+      listingId,
+      price: {
+        amount,
+        currency
+      },
+      interval: {
+        period,
+        count
+      },
+    } = priceData;
+
+    return {
+      price_data: {
+        product: listingId,
+        unit_amount: amount,
+        currency: currency,
+        recurring: {
+          interval: period,
+          interval_count: count
+        }
+      },
+      quantity
+    }
+  }
+
+  throw ({
+    code: 400,
+    data: createFlexErrorObject({
+      status: 400,
+      message: WRONG_PARAMS,
+      messageCode: WRONG_PARAMS
+    })
+  });
+});
+```
+
+##### User2Admin
+
+```js
+const createUser2AdminSubscriptionParams = async ({
+  fnParams,
+  customer
+}) => {
+  const {
+    params: {
+      lineItems,
+      protectedData = {}
+    }
+  } = fnParams;
+
+  const items = createItems(lineItems);
+
+  //TODO: Inject your own params to configure Stripe subscription to your liking here.
+  //Full documentation: https://stripe.com/docs/api/subscriptions/create
+  return {
+    customer: customer.stripeCustomer.id,
+    items,
+    metadata: {
+      protectedData: JSON.stringify(protectedData),
+      'sharetribe-user-id': customer.id.uuid,
+    }
+  };
+}
+```
+
+##### Customer2Provider
+
+```js
+const createCustomer2ProviderSubscriptionParams = async ({
+  fnParams,
+  customer,
+  provider
+}) => {
+  const {
+    params: {
+      lineItems,
+      protectedData,
+      bookingStartTime,
+      bookingEndTime,
+      commissionPercentage,
+    }
+  } = fnParams;
+
+  const items = createItems(lineItems);
+
+  const params = {
+    customer: customer.stripeCustomer.id,
+    items,
+    transfer_data: {
+      destination: provider.stripeAccount.attributes.stripeAccountId,
+    },
+    metadata: {
+      protectedData: protectedData ? JSON.stringify(protectedData) : {},
+      'sharetribe-user-id': customer.id.uuid,
+      'sharetribe-provider-id': provider.id.uuid,
+      'stripe-destination': provider.stripeAccount.attributes.stripeAccountId,
+      'stripe-customer': customer.stripeCustomer.id,
+    },
+    on_behalf_of: provider.stripeAccount.attributes.stripeAccountId
+  };
+
+  if (bookingStartTime) {
+    params.trial_end = bookingStartTime;
+  }
+  if (bookingEndTime) {
+    params.cancel_at = bookingEndTime;
+  }
+  if (commissionPercentage) {
+    /**
+     * Because subscription is hard to calculate pro-rated amount
+     * Stripe can't create subscription with flat-fee
+     * You want to take flat-fee, you must set it separately by invoice
+     * Create a webhook to receive when an invoice is called and set the @application_fee_amount
+     * Further guide: https://stripe.com/docs/connect/subscriptions#subscription-invoices
+     */
+    params.application_fee_percent = commissionPercentage;
+  }
+
+  return params;
+}
+```
+### Normalise returned subscription data
+
+```js
+export const DETAILS_SUBSCRIPTION_ATTRIBUTES_TO_TAKE_FROM_STRIPE = [
+  "id",
+  "cancel_at_period_end",
+  "current_period_end",
+  "current_period_start",
+  "items",
+  "latest_invoice",
+  "status",
+  "days_until_due",
+  "trial_end",
+  "livemode",
+  "metadata",
+  "tax_percent",
+  "customer"
+];
+
+export const SUBSCRIPTION_ITEMS_ATTRIBUTES_TO_TAKE_FROM_STRIPE = [
+  "id",
+  "metadata",
+  "price",
+  "quantity",
+];
+
+export const SUBSCRIPTION_PRICING_ATTRIBUTES_TO_TAKE_FROM_STRIPE = [
+  "id",
+  "interval",
+  "interval_count",
+  "livemode",
+  "tiers",
+  "tiers_mode",
+  "currency",
+  "amount",
+  "amount_decimal",
+  "billing_scheme",
+  "nickname"
+];
+export const SUBSCRIPTION_BOOKING_TYPE = 'subscription-booking';
+export const SUBSCRIPTION_STRIPE_CUSTOMER_TYPE = 'stripe-customer';
+
+const normaliseSubscriptionData = async (stripeSubscriptionEntity) => {
+  const subscription = pick(stripeSubscriptionEntity, DETAILS_SUBSCRIPTION_ATTRIBUTES_TO_TAKE_FROM_STRIPE);
+
+  const subscriptionInCamelCase = convertObjToCamelCase(subscription);
+  const {
+    id,
+    metadata,
+    customer,
+    cancelAtPeriodEnd,
+    currentPeriodEnd,
+    currentPeriodStart,
+    daysUntilDue,
+    taxPercent,
+    status,
+  } = subscriptionInCamelCase;
+
+  return {
+    data: {
+      id: new UUID(id),
+      types: SUBSCRIPTION_TYPE,
+      attributes: {
+        taxPercent,
+        status,
+        items: subscription.items.data.map(item => {
+          return {
+            ...convertObjToCamelCase(
+              pick(item, SUBSCRIPTION_ITEMS_ATTRIBUTES_TO_TAKE_FROM_STRIPE)
+            ),
+            price: convertObjToCamelCase(
+              pick(item.price, SUBSCRIPTION_PRICING_ATTRIBUTES_TO_TAKE_FROM_STRIPE)
+            )
+          }
+        }),
+        protectedData: metadata.protectedData
+          ? JSON.parse(metadata.protectedData)
+          : {}
+      },
+      relationships: {
+        stripeCustomer: {
+          data: {
+            id: new UUID(customer),
+            type: SUBSCRIPTION_STRIPE_CUSTOMER_TYPE
+          }
+        },
+        booking: {
+          data: {
+            id: new UUID(subscription.id),
+            type: SUBSCRIPTION_BOOKING_TYPE,
+          }
+        }
+      },
+    },
+    included: [
+      {
+        id: new UUID(customer),
+        type: SUBSCRIPTION_STRIPE_CUSTOMER_TYPE
+      },
+      {
+        id: new UUID(subscription.id),
+        type: SUBSCRIPTION_BOOKING_TYPE,
+        cancelAtPeriodEnd,
+        daysUntilDue,
+        start: new Date(currentPeriodStart * 1000),
+        bookingStart: new Date(currentPeriodStart * 1000),
+        end: new Date(currentPeriodEnd * 1000),
+        bookingEnd: new Date(currentPeriodEnd * 1000)
+      },
+    ],
+  }
+
+}
+```
+## Update subscription
+
+### Common logic
+
+```js
+export const updateSubscription = async (fnParams) => {
+  const { id } = fnParams;
+
+  return composePromises(
+    stripe.subscriptions.retrieve,
+    normaliseSubscriptionData
+    updateSubscriptionOnStripe(fnParams),
+    normaliseSubscriptionData,
+  )(id);
+}
+```
+### Incoming params
+
+So you can add more attributes to map to Stripe subscription data if needed, but for the sake of simplicity the recipe only show the most basic choice, which is creating new line items for changing subscription plans or create a new one. Some example of what could be added later:
+- Cancel subscription
+- Resume current subscription cycle
+- ...
+
+```js
+const fnParams = {
+  id: string.isRequired,
+  params: shape({
+    lineItems: arrayOf(shape({
+      pricingId: string,
+      quantity: number.isRequired,
+      priceData: shape({
+        listingId: uuid.isRequired,
+        interval: shape({
+          period: oneOf(['day', 'week', 'month', 'year']).isRequired,
+          count: number.isRequired
+        }),
+        price: shape({
+          amount: number.isRequired,
+          currency: string.isRequired
+        })
+      })
+    }))
+  })
+}
+```
+### Updating subscription in Stripe
+
+```js
+const updateSubscriptionOnStripe = (fnParams) => async (subscription) => {
+  const {
+    params: {
+      lineItems,
+      protectedData
+    }
+  } = fnParams;
+
+  return stripe.subscriptions.update(
+    subscription.id.uuid,
+    createParams({
+      subscription,
+      lineItems,
+      protectedData
+    }));
+}
+```
+#### Creating params
+So for this one the line items logic needs to be adjusted a bit. We would need to notify Stripe which item need to be updated and which item needs to be removed
+
+```js
+const createParams = ({
+  subscription,
+  lineItems,
+  protectedData
+}) => {
+  const items = createUpdatedItems({
+    lineItems,
+    currentItems: subscription.attributes.items,
+  });
+  const params = {
+    items
+  };
+
+  if (protectedData) {
+    params.metadata = JSON.stringify({
+      ...subscription.attributes.protectedData,
+      ...protectedData
+    });
+  }
+
+  return params;
+}
+```
+#### Creating updated items
+```js
+const WRONG_PARAMS = 'WRONG_PARAMS';
+
+const createNewItems = lineItems => lineItems.map(({
+  priceData,
+  quantity
+}) => {
+  if (!priceData) {
+    throw ({
+      code: 400,
+      data: createFlexErrorObject({
+        status: 400,
+        message: WRONG_PARAMS,
+        messageCode: WRONG_PARAMS
+      })
+    });
+  }
+  const {
+    listingId,
+    price: {
+      amount,
+      currency
+    },
+    interval: {
+      period,
+      count
+    },
+  } = priceData;
+
+  return {
+    price_data: {
+      product: listingId,
+      unit_amount: amount,
+      currency: currency,
+      recurring: {
+        interval: period,
+        interval_count: count
+      }
+    },
+    quantity
+  }
+});
+
+const createUpdatedItems = ({
+  lineItems,
+  currentItems
+}) => {
+  const newItems = createNewItems(lineItems.filter(item => !!item.priceData));
+  const desiredItems = lineItems.filter(item => !!item.pricingId).map(item => {
+    const {
+      pricingId,
+      quantity
+    } = item;
+    return {
+      price: pricingId,
+      quantity
+    }
+  });
+  const updatedItems = currentItems.map((currentItem) => {
+    const {
+      price,
+      id
+    } = currentItem;
+    const existingItem = desiredItems.find(item => item.price === price.id);
+
+    if (!existingItem) {
+      return {
+        id,
+        deleted: true
+      }
+    }
+
+    existingItem.inOldPlan = true;
+
+    return {
+      id,
+      quantity: existingItem.quantity
+    };
+  });
+
+  return [
+    ...newItems,
+    ...updatedItems,
+    ...desiredItems.filter(item => !item.inOldPlan)
+  ];
+}
+```
+## Integrating with template
+
+This would entirely depends on how you expose your logic from server out. So in Journey Horizon, we configure a custom API gateway that can receive and process ST Flex transit-json requests. So for the example, we would use ST Flex client sdk to create and update subscription transaction. And to make things easy, we would inject that sdk into ST Flex's sdk when it is created
+
+### Create sdk instance point to our server
+
+You need to find all of the places that ST Flex team initiate their sdk instance inside of the template, the code snippet would usually looks like this
+
+```js
+const sdk = sharetribeSdk.createInstance({
+    transitVerbose: TRANSIT_VERBOSE,
+    clientId: CLIENT_ID,
+    httpAgent: httpAgent,
+    httpsAgent: httpsAgent,
+    tokenStore,
+    typeHandlers: sdkUtils.typeHandlers,
+    ...baseUrl,
+  });
+```
+
+we would then inject our sdk like this
+
+```js
+const baseUrl = BASE_URL ? { baseUrl: BASE_URL } : {};
+
+const sdk = sharetribeSdk.createInstance({
+    transitVerbose: TRANSIT_VERBOSE,
+    clientId: CLIENT_ID,
+    httpAgent: httpAgent,
+    httpsAgent: httpsAgent,
+    tokenStore,
+    typeHandlers: sdkUtils.typeHandlers,
+    ...baseUrl,
+  });
+
+//Replace with your own server url
+const CUSTOM_SERVER_BASE_URL = 'https://api.journeyh.io'; 
+
+const customServerBaseUrl = CUSTOM_SERVER_BASE_URL 
+  ? { baseUrl: CUSTOM_SERVER_BASE_URL } 
+  : {};
+
+const jhSdk = sharetribeSdk.createInstance({
+    transitVerbose: TRANSIT_VERBOSE,
+    clientId: CLIENT_ID,
+    httpAgent: httpAgent,
+    httpsAgent: httpsAgent,
+    tokenStore,
+    typeHandlers: sdkUtils.typeHandlers,
+    ...customServerBaseUrl,
+  });
+
+sdk.jh = jhSdk;  
+```
+
+### Initiate subscription call
+
+We would re-use Flex's checkout page, modify its logic from
+```js
+const handlePaymentIntentCreation = composeAsync(
+      fnRequestPayment,
+      fnConfirmCardPayment,
+      fnConfirmPayment,
+      fnSendMessage,
+      fnSavePaymentMethod
+    );
+```
+
+to 
+
+```js
+const handleSubscriptionCreation = composeAsync(
+      fnSavePaymentMethod
+      fnRequestPayment,
+      //Might not need this if you have trial and do off-session payment
+      fnConfirmCardPayment,
+    );
+```
+
+#### Saving customer credit card first
+
+To make it easy, we will copy the logic from `PaymentMethodsPage`
+
+```js
+//Should be in @handlePaymentIntent function
+const fnSavePaymentMethod = (fnParams) => {
+  const { stripe, card, billingDetails } = handlePaymentParams;
+
+  const stripeCustomer = ensuredCurrentUser.stripeCustomer;
+
+  await onCreateSetupIntent()
+      .then(setupIntent => {
+        const stripeParams = {
+          stripe,
+          card,
+          setupIntentClientSecret: getClientSecret(setupIntent),
+          paymentParams: {
+            payment_method_data: {
+              billing_details: billingDetails,
+            },
+          },
+        };
+
+        return onHandleCardSetup(stripeParams);
+      })
+      .then(result => {
+        const newPaymentMethod = result.setupIntent.payment_method;
+        // Note: stripe.handleCardSetup might return an error inside successful call (200), but those are rejected in thunk functions.
+
+        return onSavePaymentMethod(stripeCustomer, newPaymentMethod);
+      })
+      .catch(error => {
+        console.error(error);
+      });
+
+  return fnParams;
+}
+
+//Remember to map these dispatch to props in the checkout page.
+const mapDispatchToProps = dispatch => ({
+  //Fill in current dispatch,...
+  onHandleCardSetup: params => dispatch(handleCardSetup(params)),
+  onCreateSetupIntent: params => dispatch(createStripeSetupIntent(params)),
+  onSavePaymentMethod: (stripeCustomer, newPaymentMethod) =>
+    dispatch(savePaymentMethod(stripeCustomer, newPaymentMethod)),
+});
+
+```
+## Respond to Flex event
+
+These would be ideas for you to extend the base. You can create a transaction on Flex and let your user & operator interact with that transaction then use ST Flex's event query to detect the changes. You can then update the subscription details accordingly
+
+Ex: when creating a subscription, you would also create a transaction on ST Flex and save the Stripe subscription id to the transaction's metadata
+
+## Respond to Stripe event
+
+Stripe offers webhook which would be helpful for:
+- Detecting user has paid
+- Detecting user has not paid
+- Checking subscription status changes (trail to active,...etc)
+
+```js
+//Use these function in place that receive incoming request
+export const receiveStripeEvent = async (
+  //Taken from the request body
+  requestBody,
+  //Taken from stripe's hook request headers @stripe-signature
+  signature,
+  //Stripe would give you a secret to verify its signature when creating a webhook to verify request
+  endpointSecret
+) => {
+  let event = null;
+  try {
+    event = stripe
+      .webhooks
+      .constructEvent(requestBody, signature, endpointSecret);
+  }
+  catch (err) {
+    return {
+      code: 400,
+      data: {
+        message: `Webhook Error: ${err.message}`
+      }
+    };
+  }
+
+  // Handle the event
+  const { account, data: { object } } = event;
+
+  switch (event.type) {
+    case 'customer.subscription.created': {
+      //Respond to subscription creation
+    }
+    case 'customer.subscription.updated': {
+      //Respond to subscription status changes
+    }
+    case 'customer.subscription.deleted': {
+      //Respond to subscription end
+    }
+    default: {
+      return {
+        code: 200,
+        data: {
+          received: true
+        }
+      };
+    }
+  }
+```
+
+
+## Payout
+
+For `Customer2Provider` case, you would need to create your own payout scheduler since by default ST Flex would disable the automatic provider payout. For `User2Admin`, the default payout schedule still apply.
+## Utility
+### Object to to camel case
+
+```js
+import { transform, set, camelCase } from 'lodash'
+import {
+  isArray, isObjectLike, isPlainObject, map,
+} from 'lodash/fp'
+
+export const convertObjToCamelCase = obj => {
+  if (isArray(obj)) {
+    return obj.map(convertObjToCamelCase, obj);
+  }
+  if (isPlainObject(obj)) {
+    const iteratee = (result, value, key) =>
+      set(
+        result,
+        camelCase(key),
+        isObjectLike(value)
+          ? convertObjToCamelCase(value)
+          : value
+      );
+    return transform(obj, iteratee);
+  }
+  return obj
+}
+```
+
+### Create ST Flex error object
+
+So to make things consistent, we would try to create error message that looks like ST Flex's format
+
+```js
+import { types as sdkTypes } from 'sharetribe-flex-integration-sdk';
+
+const { UUID } = sdkTypes;
+const CUSTOM_ERROR_ID = 'jh-custom-error-id';
+
+export const createFlexErrorObject = ({
+  message,
+  messageCode,
+  status
+}) => {
+  return {
+    errors: [
+      {
+        id: new UUID(CUSTOM_ERROR_ID),
+        status,
+        title: message,
+        messageCode,
+        code: messageCode
+      }
+    ]
+  }
+}
+```
+
+### Initiate Stripe instance
+
+```js
+import Stripe from "stripe";
+import config from '../config';
+
+const stripe = new Stripe(config.stripe.secret, {
+  apiVersion: config.stripe.apiVersion,
+  maxNetworkRetries: config.retries
+});
+
+export default stripe;
+```
