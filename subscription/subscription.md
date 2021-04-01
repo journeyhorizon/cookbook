@@ -43,6 +43,7 @@
     - [Create sdk instance point to our server](#create-sdk-instance-point-to-our-server)
     - [Initiate subscription call](#initiate-subscription-call)
       - [Saving customer credit card first](#saving-customer-credit-card-first)
+    - [Request payment](#request-payment)
   - [Respond to Flex event](#respond-to-flex-event)
   - [Respond to Stripe event](#respond-to-stripe-event)
   - [Payout](#payout)
@@ -1046,6 +1047,66 @@ const mapDispatchToProps = dispatch => ({
 });
 
 ```
+### Request payment
+
+```js
+const orderParams = {
+    providerId: new UUID('authorId'), //Normal string would also be ok
+    params: {
+      bookingStartTime: 1610392000,
+      bookingEndTime: 1617166800,
+      commissionPercentage: 15,
+      lineItems: [
+        {
+          quantity: 1,
+          priceData: {
+            //For the sake of flexibility, we do not require the listing's author to be the provider
+            listingId: '5ff7d62d-ad1e-435c-b3d2-0f3797388fc6',
+            interval: {
+              period: 'month',
+              count: 1
+            },
+            price: {
+              amount: 10000,
+              currency: 'USD'
+            }
+          }
+        }
+      ]
+    }
+  }
+
+export const initiateOrder = (orderParams) => (dispatch, getState, sdk) => {
+  dispatch(initiateOrderRequest());
+
+  const handleSucces = response => {
+    const entities = denormalisedResponseEntities(response);
+    const order = entities[0];
+    dispatch(initiateOrderSuccess(order));
+    dispatch(fetchCurrentUserHasOrdersSuccess(true));
+    return order;
+  };
+
+  const handleError = e => {
+    dispatch(initiateOrderError(storableError(e)));
+    const transactionIdMaybe = transactionId ? { transactionId: transactionId.uuid } : {};
+    log.error(e, 'initiate-order-failed', {
+      ...transactionIdMaybe,
+      listingId: orderParams.listingId.uuid,
+      bookingStart: orderParams.bookingStart,
+      bookingEnd: orderParams.bookingEnd,
+    });
+    throw e;
+  };
+
+  //So in JH we setup a server that have /transactions URL that would receive request like ST Flex. We would use this one for the subscription request 
+  return sdk.jh.transactions
+      .initiate(bodyParams, queryParams)
+      .then(handleSucces)
+      .catch(handleError);
+};
+```
+
 ## Respond to Flex event
 
 These would be ideas for you to extend the base. You can create a transaction on Flex and let your user & operator interact with that transaction then use ST Flex's event query to detect the changes. You can then update the subscription details accordingly
