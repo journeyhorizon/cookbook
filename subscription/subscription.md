@@ -1,3 +1,4 @@
+# COMMERCIAL-IN-CONFIDENCE
 # Table of Contents
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
@@ -73,7 +74,7 @@ We hope that you enjoy our first cookbook. It should help you to configure your 
 ## A bit of blabbering
 
 Before begin, first, let's answer these 2 important questions:
-- Would our solution be MR.right?
+- Is our solution Mr. Right?
 - What's the catch? 
 
 Being able to know these answers before might save you lots of time and effort so please be patient and stick with me here.
@@ -1250,3 +1251,28 @@ export default stripe;
 
 # That's a Wrap
 If you have any questions about using the cookbook and find bugs in the code, please reach out to support@journeyhorizon.com or talk to us via the intercom.io chat button on our website www.journeyh.io. Good luck with your marketplace build. 
+
+# TERMS OF USE
+## Commercial-In-Confidence
+The content of this document is Commercial-In-Confidence and covered by Non-Disclosure Agreement.
+
+## Grant of Copyright License. 
+Subject to the terms and conditions of this License, JourneyHorizon Pty Ltd grants to You a perpetual, worldwide, non-exclusive copyright license to reproduce, prepare Derivative Works of, publicly display, and publicly perform in Source or Object form for a single Marketplace built using Sharetribe Flex.
+
+## Charges and Royalties
+Any charges or Royalties associated with this License have been agreed between the JourneyHorizon Pty Ltd and You. Any non-payment of such Charges and Royalties shall terminate this license.
+
+## Redistribution. 
+You may not reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form.
+
+## Assignment.
+You may assign this License as part of any Asset or Company sale to a third-party.
+
+## Trademarks. 
+This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+## Disclaimer of Warranty. 
+Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+## Limitation of Liability
+In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
