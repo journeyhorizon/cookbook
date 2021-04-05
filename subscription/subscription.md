@@ -15,9 +15,9 @@
     - [Get listing data](#get-listing-data)
     - [Create product params](#create-product-params)
   - [Init subscription](#init-subscription)
-    - [User2Admin](#user2admin)
+    - [Marketplace2User](#marketplace2user)
       - [Incoming Params](#incoming-params)
-    - [Customer2Provider](#customer2provider)
+    - [Provider2Customer](#provider2customer)
       - [Incoming Params](#incoming-params-1)
     - [Fetching users data](#fetching-users-data)
       - [Common fetch users data used by both provider and customer](#common-fetch-users-data-used-by-both-provider-and-customer)
@@ -25,13 +25,13 @@
         - [Finding Stripe customer on Stripe](#finding-stripe-customer-on-stripe)
       - [Provider](#provider)
     - [Checking requirement](#checking-requirement)
-      - [User2Admin](#user2admin-1)
-      - [Provider2Customer](#provider2customer)
+      - [Marketplace2User](#marketplace2user-1)
+      - [Provider2Customer](#provider2customer-1)
     - [Talk to Stripe](#talk-to-stripe)
       - [Map input params to Stripe params](#map-input-params-to-stripe-params)
         - [Common function to map our line items to Stripe's line items](#common-function-to-map-our-line-items-to-stripes-line-items)
-        - [User2Admin](#user2admin-2)
-        - [Customer2Provider](#customer2provider-1)
+        - [Marketplace2User](#marketplace2user-2)
+        - [Provider2Customer](#provider2customer-2)
     - [Normalise returned subscription data](#normalise-returned-subscription-data)
   - [Update subscription](#update-subscription)
     - [Common logic](#common-logic)
@@ -79,7 +79,7 @@ Being able to know these answers before might save you lots of time and effort s
 Let's consider these aspects to see if it's a right fit for you:
   
 1) **Development Effort**: yes, you would need a developer to connect the dot. 
-2) **Capability**: Admin2Customer, Admin2Provider, Customer2Provider.
+2) **Capability**: Admin2Customer, Admin2Provider, Provider2Customer.
 3) **Supported countries**: Depends - Right now the guide is using Stripe so what Stripe support, your site can also have it.
 4) **Supported payment method**: Saved credit cards. For ACH and other type of payment, Stripe also supports it but would need further implementation.
 5) **Payment compliance**: we would use Stripe & ST Flex built-in mechanism.
@@ -106,7 +106,7 @@ To help you understand the argument definition better, these recipes would use S
 
 #### Some concepts about Stripe
 
-- **Stripe pricing Id**: So for `User2Admin` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
+- **Stripe pricing Id**: So for `Marketplace2User` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
 - **Product**: This is a Stripe concept. It's meaning would be similar to the listing on your marketplace
 
 ## Overall solution
@@ -140,7 +140,7 @@ export const composePromises = composeMRight('then');
 So you would only need to create a Stripe product if you want to create a subscription to a listing which usually belongs to the provider. There are multiple places where you can create a product:
 - At the point of listing creation - use ST Flex's event and detect if there are any listing creation event, then we sync with Stripe
 - At the point of initiating subscription - this helps reduce duplication of data if on your marketplace there might be only a portion of listings that would offer subscription
-- Manually using Stripe dashboard - usually for `User2Admin` case where the product is actually the marketplace's service and does not tight to any listing.
+- Manually using Stripe dashboard - usually for `Marketplace2User` case where the product is actually the marketplace's service and does not tight to any listing.
 
 ```js
 export const createStripeProduct = listingId => {
@@ -186,8 +186,8 @@ Here is a simple flow chart of what we would do:
 
 I will not go deeper in the `authentication` aspect and only focus on how would we interact with our server & Stripe here. So assuming we have already verified the incoming request -  meaning it's from a trusted source.
 
-### User2Admin
-When it's subscription `User2Admin`:
+### Marketplace2User
+When it's subscription `Marketplace2User`:
 ```js
 const { customerId } = fnParams;
 
@@ -204,7 +204,7 @@ const initSubscription = composePromises(
 
 A note here is that the `customerId` is the ST Flex UUID of the customer. We would need it to fetch more detailed about the customer's data which usually includes saved credit cards, data from Stripe that belongs to that customer.
 
-`fnParams` for `User2Admin`
+`fnParams` for `Marketplace2User`
 ```js
 const fnParams = {
   customerId: uuid.isRequired,
@@ -221,9 +221,9 @@ const fnParams = {
 
 A refresher - For admin to user, we can define the subscription plan using the Stripe dashboard and each price would have their own ID. That's why we only need to parse in the price ID and the quantity the user want to subscribe to.
 
-### Customer2Provider
+### Provider2Customer
 
-When it's subscription `Customer2Provider`:
+When it's subscription `Provider2Customer`:
 ```js
 const { customerId, providerId } = fnParams;
 
@@ -243,7 +243,7 @@ const initSubscription = composePromises(
 
 A note here is that the `customerId` and `providerId` is the ST Flex UUID of the customer and the provider. We would need it to fetch more detailed about the customer's data and also need to check if the provider has already connected to Stripe or not.
 
-`fnParams` for `Customer2Provider`
+`fnParams` for `Provider2Customer`
 ```js
 const fnParams = {
   customerId: uuid.isRequired,
@@ -275,7 +275,7 @@ const fnParams = {
 
 ### Fetching users data
 
-So there would be 2 entities for us to fetch, the `customer` and the `provider`, for `Customer2Provider`case, we would create a function to fetch both in parallel, while in the `User2Admin` case, we would only need the `fetchCustomer` function.
+So there would be 2 entities for us to fetch, the `customer` and the `provider`, for `Provider2Customer`case, we would create a function to fetch both in parallel, while in the `Marketplace2User` case, we would only need the `fetchCustomer` function.
 
 
 #### Common fetch users data used by both provider and customer
@@ -359,7 +359,7 @@ export const fetchProvider = async (id) => {
 
 ### Checking requirement
 
-#### User2Admin
+#### Marketplace2User
 
 We would be using ST Flex template's built in mechanism to save credit card (This one would be cover in another recipes). So our user should already save credit card first before initiating the subscription. We can add up others validation logic here as well.
 
@@ -447,14 +447,14 @@ or just
 }
 ```
 
-If it's `User2Admin`:
+If it's `Marketplace2User`:
 
 ```js
 const initSubscription = (fnParams) => async ({
   customer,
 }) => {
   return composePromises(
-    createUser2AdminSubscriptionParams,
+    createMarketplace2UserSubscriptionParams,
     //Calling Stripe directly
     stripe.subscriptions.create
   )({
@@ -464,7 +464,7 @@ const initSubscription = (fnParams) => async ({
 }
 ```
 
-If it's `Customer2Provider`:
+If it's `Provider2Customer`:
 
 ```js
 const initSubscription = (fnParams) => async ({
@@ -472,7 +472,7 @@ const initSubscription = (fnParams) => async ({
   provider
 }) => {
   return composePromises(
-    createCustomer2ProviderSubscriptionParams,
+    createProvider2CustomerSubscriptionParams,
     //Calling Stripe directly
     stripe.subscriptions.create
   )({
@@ -540,10 +540,10 @@ const createItems = lineItems => lineItems.map(({
 });
 ```
 
-##### User2Admin
+##### Marketplace2User
 
 ```js
-const createUser2AdminSubscriptionParams = async ({
+const createMarketplace2UserSubscriptionParams = async ({
   fnParams,
   customer
 }) => {
@@ -569,10 +569,10 @@ const createUser2AdminSubscriptionParams = async ({
 }
 ```
 
-##### Customer2Provider
+##### Provider2Customer
 
 ```js
-const createCustomer2ProviderSubscriptionParams = async ({
+const createProvider2CustomerSubscriptionParams = async ({
   fnParams,
   customer,
   provider
@@ -1172,7 +1172,7 @@ export const receiveStripeEvent = async (
 
 ## Payout
 
-For `Customer2Provider` case, you would need to create your own payout scheduler since by default ST Flex would disable the automatic provider payout. For `User2Admin`, the default payout schedule still apply.
+For `Provider2Customer` case, you would need to create your own payout scheduler since by default ST Flex would disable the automatic provider payout. For `Marketplace2User`, the default payout schedule still apply.
 ## Utility
 ### Object to to camel case
 
