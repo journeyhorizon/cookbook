@@ -95,7 +95,7 @@ Being able to know these answers before might save you lots of time and effort s
 Let's consider these aspects to see if it's a right fit for you:
   
 1) **Development Effort**: yes, you will need a developer to connect the dots. 
-2) **Capability**: Admin2Customer, Admin2Provider, Customer2Provider.
+2) **Capability**: Marketplace2User, Provider2Customer.
 3) **Supported Countries**: Depends - Right now the guide is using Stripe so whatever Stripes supports,
 4) **Supported Payment Method**: Saved credit cards only. We are working on ACH and other types of payment supported by Stripe.
 5) **Payment Compliance**: we would use Stripe & ST Flex API built-in mechanism.
@@ -122,7 +122,7 @@ To help you understand the argument definition better, these recipes would use S
 
 #### Some Concepts About Stripe
 
-- **Stripe Pricing Id**: So for `User2Admin` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
+- **Stripe Pricing Id**: So for `Marketplace2User` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
 - **Product**: This is a Stripe concept. It's meaning would be similar to the listing on your marketplace
 
 ## Overall Solution
@@ -158,7 +158,7 @@ export const composePromises = composeMRight('then');
 To create a subscription to a listing which belongs to the provider, create a Stripe product. There are multiple places where you can create a product:
 - At the point of listing creation - use ST Flex's event and detect if there are any listing creation event, then sync with Stripe
 - At the point of initiating a subscription transaction - this helps reduce duplication of data if on your marketplace there might be only a portion of listings that offer subscription
-- Manually using Stripe dashboard - usually for `User2Admin` case where the product is actually the marketplace's service and does not align to any listing.
+- Manually using Stripe dashboard - usually for `Marketplace2User` case where the product is actually the marketplace's service and does not align to any listing.
 
 ```js
 export const createStripeProduct = listingId => {
