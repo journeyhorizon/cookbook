@@ -116,6 +116,8 @@ We are using:
 - A server (you can use ST Flex's built in or use a light-weight ExpressJS server, or even a Deno server if you are a fan of experimenting new languages)
 - Stripe webhooks (for you to respond to what happen if subscription end/start,...etc)
 
+![subscription-overall](./subscription-overall.png "subscription-overall")
+
 # Recipes
 
 ## Composing promises
@@ -1172,7 +1174,10 @@ export const receiveStripeEvent = async (
 
 ## Payout
 
-For `Provider2Customer` case, you would need to create your own payout scheduler since by default ST Flex would disable the automatic provider payout. For `Marketplace2User`, the default payout schedule still apply.
+For `Provider2Customer` case, you would need to create your own payout scheduler since by default ST Flex would disable the automatic provider payout. For `Marketplace2User`, the default payout schedule still apply. On details on how to create a scheduler, we would have to leave this one for later but here are some ideas you can try:
+- Using AWS CloudWatch Event and combine them with Lambda to trigger actions
+- Using Google Scheduler and Cloud Function to manage the recurring jobs
+- Or you can create your own with the help of packages like [Node.js schedule](https://github.com/node-schedule/node-schedule#readme)
 ## Utility
 ### Object to to camel case
 
