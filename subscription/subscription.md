@@ -1,30 +1,32 @@
+# COMMERCIAL-IN-CONFIDENCE
 # Table of Contents
+- [COMMERCIAL-IN-CONFIDENCE](#commercial-in-confidence)
 - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
   - [A bit of blabbering](#a-bit-of-blabbering)
-    - [Fitting with your marketplace](#fitting-with-your-marketplace)
-    - [Foreseen problem](#foreseen-problem)
+    - [Fitting With Your Marketplace](#fitting-with-your-marketplace)
+    - [Foreseen Problem](#foreseen-problem)
   - [Preparation](#preparation)
     - [Note](#note)
     - [Stripe](#stripe)
-      - [Some concepts about Stripe](#some-concepts-about-stripe)
-  - [Overall solution](#overall-solution)
+      - [Some Concepts About Stripe](#some-concepts-about-stripe)
+  - [Overall Solution](#overall-solution)
 - [Recipes](#recipes)
-  - [Composing promises](#composing-promises)
-  - [Creating Stripe product](#creating-stripe-product)
-    - [Get listing data](#get-listing-data)
-    - [Create product params](#create-product-params)
-  - [Init subscription](#init-subscription)
+  - [Composing Promises](#composing-promises)
+  - [Creating Stripe Product](#creating-stripe-product)
+    - [Get Listing Data](#get-listing-data)
+    - [Create Product Params](#create-product-params)
+  - [Init Subscription](#init-subscription)
     - [Marketplace2User](#marketplace2user)
       - [Incoming Params](#incoming-params)
     - [Provider2Customer](#provider2customer)
       - [Incoming Params](#incoming-params-1)
-    - [Fetching users data](#fetching-users-data)
-      - [Common fetch users data used by both provider and customer](#common-fetch-users-data-used-by-both-provider-and-customer)
+    - [Fetching Users Data](#fetching-users-data)
+      - [Common Fetch Users Data used by both Provider and Customer](#common-fetch-users-data-used-by-both-provider-and-customer)
       - [Customer](#customer)
-        - [Finding Stripe customer on Stripe](#finding-stripe-customer-on-stripe)
+        - [Finding Stripe Customer on Stripe](#finding-stripe-customer-on-stripe)
       - [Provider](#provider)
-    - [Checking requirement](#checking-requirement)
+    - [Checking Requirement](#checking-requirement)
       - [Marketplace2User](#marketplace2user-1)
       - [Provider2Customer](#provider2customer-1)
     - [Talk to Stripe](#talk-to-stripe)
@@ -32,63 +34,77 @@
         - [Common function to map our line items to Stripe's line items](#common-function-to-map-our-line-items-to-stripes-line-items)
         - [Marketplace2User](#marketplace2user-2)
         - [Provider2Customer](#provider2customer-2)
-    - [Normalise returned subscription data](#normalise-returned-subscription-data)
-  - [Update subscription](#update-subscription)
-    - [Common logic](#common-logic)
-    - [Incoming params](#incoming-params-2)
-    - [Updating subscription in Stripe](#updating-subscription-in-stripe)
-      - [Creating params](#creating-params)
-      - [Creating updated items](#creating-updated-items)
-  - [Integrating with template](#integrating-with-template)
-    - [Create sdk instance point to our server](#create-sdk-instance-point-to-our-server)
-    - [Initiate subscription call](#initiate-subscription-call)
-      - [Saving customer credit card first](#saving-customer-credit-card-first)
-    - [Request payment](#request-payment)
-  - [Respond to Flex event](#respond-to-flex-event)
-  - [Respond to Stripe event](#respond-to-stripe-event)
+    - [Normalise Returned Subscription Data](#normalise-returned-subscription-data)
+  - [Update Subscription](#update-subscription)
+    - [Common Logic](#common-logic)
+    - [Incoming Params](#incoming-params-2)
+    - [Updating Subscription in Stripe](#updating-subscription-in-stripe)
+      - [Creating Params](#creating-params)
+      - [Creating Updated Items](#creating-updated-items)
+  - [Integrating with ST Flex Web Template](#integrating-with-st-flex-web-template)
+    - [Create SDK Instance Point to our Server](#create-sdk-instance-point-to-our-server)
+    - [Initiate Subscription Call](#initiate-subscription-call)
+      - [Saving Customer Credit Card First](#saving-customer-credit-card-first)
+    - [Request Payment](#request-payment)
+  - [Respond to Flex Event](#respond-to-flex-event)
+  - [Respond to Stripe Event](#respond-to-stripe-event)
   - [Payout](#payout)
   - [Utility](#utility)
     - [Object to to camel case](#object-to-to-camel-case)
-    - [Create ST Flex error object](#create-st-flex-error-object)
+    - [Create ST Flex Error Object](#create-st-flex-error-object)
     - [Initiate Stripe instance](#initiate-stripe-instance)
+- [That's a Wrap](#thats-a-wrap)
+- [TERMS OF USE](#terms-of-use)
+  - [Commercial-In-Confidence](#commercial-in-confidence-1)
+  - [Grant of Copyright License.](#grant-of-copyright-license)
+  - [Charges and Royalties](#charges-and-royalties)
+  - [Redistribution.](#redistribution)
+  - [Assignment.](#assignment)
+  - [Trademarks.](#trademarks)
+  - [Disclaimer of Warranty.](#disclaimer-of-warranty)
+  - [Limitation of Liability](#limitation-of-liability)
 
 
 # Introduction
 
 TLDR; 
-> Subscription is hard, hence the cookbook.
+> Adding subscription functionality is hard, hence our first cookbook.
 
 ---
 
-Online marketplaces has evolved tremendously over the years. With Sharetribe Flex's help it is even easier to setup your marketplace. But due to COVID-19, marketplaces is gaining lots of attention. As as result, ideas for creating marketplace has become incredibly diverse.
+Online marketplaces has evolved tremendously over the years. With Sharetribe Flex's help it is even easier to setup your marketplace. But due to COVID-19, marketplaces have gained alot of attention. As as result, ideas for creating marketplace has become incredibly diverse.
 
-Membership fees for seeing exclusive market contents, subscription fees for layering the market's service or long-term rental between the provider and customer,...the list is getting longer by day. Subscription has become a key to add multitude of flavour to the marketplace. While Sharetribe Flex already offers a lot, the team can't satisfy everyone's need.
+Subscription functionality has been frequently requested by Sharetribe Flex marketplace owners for the following 2 use case.
+1) marketplace subscription fees for layering functionality - for example the marketplace offers 3 subscription tiers, SILVER, GOLD, PLATINUM with each tier offering different levels of functionality or benefits for the user; or 
+2) Recurring rental between the provider and customer - for example your marketplace providers want to offer large equipment for long term rental to customers, the transaction allows for recurring rental payments at different frequencies for a period of time.
 
-That's why the Journey Horizon team decided to help out and write this cookbook. This will hold the recipes for you to cook the subscription services to your liking when you are using Sharetribe Flex.
+the list is getting longer by day. 
+
+We hope that you enjoy our first cookbook. It should help you to configure your subscritpion functionality the way you want. We want to improve this product so please give us feedback. 
 
 ## A bit of blabbering
 
 Before begin, first, let's answer these 2 important questions:
-- Would our solution be MR.right?
+- Is our solution Mr. Right?
 - What's the catch? 
 
 Being able to know these answers before might save you lots of time and effort so please be patient and stick with me here.
 
-### Fitting with your marketplace
+### Fitting With Your Marketplace
 
 Let's consider these aspects to see if it's a right fit for you:
   
-1) **Development Effort**: yes, you would need a developer to connect the dot. 
-2) **Capability**: Admin2Customer, Admin2Provider, Provider2Customer.
-3) **Supported countries**: Depends - Right now the guide is using Stripe so what Stripe support, your site can also have it.
-4) **Supported payment method**: Saved credit cards. For ACH and other type of payment, Stripe also supports it but would need further implementation.
-5) **Payment compliance**: we would use Stripe & ST Flex built-in mechanism.
+1) **Development Effort**: yes, you will need a developer to connect the dots. 
+2) **Capability**: Admin2Customer, Admin2Provider, Customer2Provider.
+3) **Supported Countries**: Depends - Right now the guide is using Stripe so whatever Stripes supports,
+4) **Supported Payment Method**: Saved credit cards only. We are working on ACH and other types of payment supported by Stripe.
+5) **Payment Compliance**: we would use Stripe & ST Flex API built-in mechanism.
 6) **Languages**: Javascript
-7) **Required experience**: Should be familiar with Flex and some simple concept of Stripe (Which we would be covering some essential part here)
+7) **Required Experience**: Should be familiar with Flex API, React.js and how Stripe works (Which we would be covering some essential part here)
 
-### Foreseen problem
+### Foreseen Problem
 
-- The solution would heavily depends on using ST Flex's template and Stripe so if either of them has big changes, this guide could become obsolete.
+- The solution would heavily depends on using ST Flex Web template and Stripe API so if either of them has big changes, this guide could become obsolete.
 
 - Stripe's subscription is still in the beta state. You would need to email them to get access to the beta program. But because of that, the APIs would be subject to changes in the future.
 
@@ -97,36 +113,36 @@ Let's consider these aspects to see if it's a right fit for you:
 
 ### Note
 
-To help you understand the argument definition better, these recipes would use ST Flex template's way of declaring default props for declaring incoming params. In actual implement, it could be different.
+To help you understand the argument definition better, these recipes would use ST Flex web template's way of declaring default props for incoming params. In actual implementation, it could be different.
 
 ### Stripe
 
 - Supported version: from `2020-08-27` and above
 - Email to Stripe and ask to join beta problem for using `on_behalf_of` for subscription
 
-#### Some concepts about Stripe
+#### Some Concepts About Stripe
 
-- **Stripe pricing Id**: So for `Marketplace2User` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
+- **Stripe Pricing Id**: So for `User2Admin` cases, you can use Stripe's dashboard to define the subscription plan that the user can subscribed to. And you can then attach a price to those plan. Those prices would have their own set of unique ID, which we would usually refer as `pricingId`
 - **Product**: This is a Stripe concept. It's meaning would be similar to the listing on your marketplace
 
-## Overall solution
+## Overall Solution
 
 We are using:
-- ST Flex template
-- A server (you can use ST Flex's built in or use a light-weight ExpressJS server, or even a Deno server if you are a fan of experimenting new languages)
-- Stripe webhooks (for you to respond to what happen if subscription end/start,...etc)
+- ST Flex Web Template
+- A server (you can use ST Flex's built in or use a light-weight ExpressJS server, or even a Deno server if you are a fan of experimenting with new languages)
+- Stripe webhooks (for you to respond to Stripe subscription events such as end/start,...etc)
 
 ![subscription-overall](./subscription-overall.png "subscription-overall")
 
 # Recipes
 
-## Composing promises
+## Composing Promises
 
-From now on, the example codes would heavily used the following concept:
+From now on, the example code will use the following concepts:
 -  `Curry function` - You can read more about it [here](https://medium.com/javascript-scene/curry-and-function-composition-2c208d774983)
--  Function called `composePromises`. The purposes is to create a easy to read promise chain where the output of the current function would be the input of the next one.
+-  `composePromises` Function. The purpose is to create an easy to read promise chain where the output of the current function would be the input of the next one.
 
-Here is a simple implementation of `composePromises`, there are far more better way of achieving it, so this is not the only way to compose promises:
+Here is a simple implementation of `composePromises`, there are far better ways of achieving it, so this is not the only way to compose promises:
 
 ```js
 const composeMRight = method => (...ms) => (
@@ -137,12 +153,12 @@ const composeMRight = method => (...ms) => (
 export const composePromises = composeMRight('then');
 ```
 
-## Creating Stripe product
+## Creating Stripe Product
 
-So you would only need to create a Stripe product if you want to create a subscription to a listing which usually belongs to the provider. There are multiple places where you can create a product:
-- At the point of listing creation - use ST Flex's event and detect if there are any listing creation event, then we sync with Stripe
-- At the point of initiating subscription - this helps reduce duplication of data if on your marketplace there might be only a portion of listings that would offer subscription
-- Manually using Stripe dashboard - usually for `Marketplace2User` case where the product is actually the marketplace's service and does not tight to any listing.
+To create a subscription to a listing which belongs to the provider, create a Stripe product. There are multiple places where you can create a product:
+- At the point of listing creation - use ST Flex's event and detect if there are any listing creation event, then sync with Stripe
+- At the point of initiating a subscription transaction - this helps reduce duplication of data if on your marketplace there might be only a portion of listings that offer subscription
+- Manually using Stripe dashboard - usually for `User2Admin` case where the product is actually the marketplace's service and does not align to any listing.
 
 ```js
 export const createStripeProduct = listingId => {
@@ -154,7 +170,7 @@ export const createStripeProduct = listingId => {
   )({ listingId: id, include: ['author'] });
 }
 ```
-### Get listing data
+### Get Listing Data
 
 ```js
 export const getListingData = ({ id, include = ['author'] }) =>
@@ -169,7 +185,7 @@ export const getListingData = ({ id, include = ['author'] }) =>
     return entities[0];
   });
 ```
-### Create product params
+### Create Product Params
 
 ```js
 const createProductParams = async (listing) => {
@@ -180,7 +196,7 @@ const createProductParams = async (listing) => {
   }
 }
 ```
-## Init subscription
+## Init Subscription
 
 Here is a simple flow chart of what we would do:
 
@@ -204,7 +220,7 @@ const initSubscription = composePromises(
 
 #### Incoming Params
 
-A note here is that the `customerId` is the ST Flex UUID of the customer. We would need it to fetch more detailed about the customer's data which usually includes saved credit cards, data from Stripe that belongs to that customer.
+A note here is that the `customerId` is the ST Flex UUID of the customer. We would need it to fetch more detail about the customer's data which usually includes saved credit cards, data from Stripe that belongs to that customer.
 
 `fnParams` for `Marketplace2User`
 ```js
@@ -275,12 +291,12 @@ const fnParams = {
 }
 ```
 
-### Fetching users data
+### Fetching Users Data
 
 So there would be 2 entities for us to fetch, the `customer` and the `provider`, for `Provider2Customer`case, we would create a function to fetch both in parallel, while in the `Marketplace2User` case, we would only need the `fetchCustomer` function.
 
 
-#### Common fetch users data used by both provider and customer
+#### Common Fetch Users Data used by both Provider and Customer
 
 ```js
 export const getUserData = ({ id, include = ['profileImage'] }) =>
@@ -312,7 +328,7 @@ const fetchCustomer = async (id) => {
   })
 }
 ```
-##### Finding Stripe customer on Stripe
+##### Finding Stripe Customer on Stripe
 
 ```js
 import pick from "lodash/pick";
@@ -359,11 +375,11 @@ export const fetchProvider = async (id) => {
 }
 ```
 
-### Checking requirement
+### Checking Requirement
 
 #### Marketplace2User
 
-We would be using ST Flex template's built in mechanism to save credit card (This one would be cover in another recipes). So our user should already save credit card first before initiating the subscription. We can add up others validation logic here as well.
+We would be using ST Flex template's built in mechanism to save credit card (This one would be covered in another recipe). So our user should already save credit card first before initiating the subscription. We can check other validation logic here as well.
 
 ```js
 const NO_PAYMENT_METHOD_ERROR = 'NO_PAYMENT_METHOD_ERROR';
@@ -390,7 +406,7 @@ export const checkSubscriptionRequirement = async (customer) => {
 
 #### Provider2Customer
 
-We would need to check if the customer has credit card and if provider has already connect their account
+We would need to check if the customer has credit card and if provider has already connected their account
 
 ```js
 const HAVE_NOT_CONNECTED_STRIPE_ACCOUNT = 'HAVE_NOT_CONNECTED_STRIPE_ACCOUNT';
@@ -627,7 +643,7 @@ const createProvider2CustomerSubscriptionParams = async ({
   return params;
 }
 ```
-### Normalise returned subscription data
+### Normalise Returned Subscription Data
 
 ```js
 export const DETAILS_SUBSCRIPTION_ATTRIBUTES_TO_TAKE_FROM_STRIPE = [
@@ -741,9 +757,9 @@ const normaliseSubscriptionData = async (stripeSubscriptionEntity) => {
 
 }
 ```
-## Update subscription
+## Update Subscription
 
-### Common logic
+### Common Logic
 
 ```js
 export const updateSubscription = async (fnParams) => {
@@ -757,9 +773,9 @@ export const updateSubscription = async (fnParams) => {
   )(id);
 }
 ```
-### Incoming params
+### Incoming Params
 
-So you can add more attributes to map to Stripe subscription data if needed, but for the sake of simplicity the recipe only show the most basic choice, which is creating new line items for changing subscription plans or create a new one. Some example of what could be added later:
+So you can add more attributes to map to Stripe subscription data if needed, but for the sake of simplicity the recipe only shows the most basic choice, which is creating new line items for changing subscription plans or create a new one. Some example of what could be added later:
 - Cancel subscription
 - Resume current subscription cycle
 - ...
@@ -786,7 +802,7 @@ const fnParams = {
   })
 }
 ```
-### Updating subscription in Stripe
+### Updating Subscription in Stripe
 
 ```js
 const updateSubscriptionOnStripe = (fnParams) => async (subscription) => {
@@ -806,8 +822,8 @@ const updateSubscriptionOnStripe = (fnParams) => async (subscription) => {
     }));
 }
 ```
-#### Creating params
-So for this one the line items logic needs to be adjusted a bit. We would need to notify Stripe which item need to be updated and which item needs to be removed
+#### Creating Params
+So for this one the line item logic needs to be adjusted a bit. We would need to notify Stripe which item needs to be updated and which item needs to be removed
 
 ```js
 const createParams = ({
@@ -833,7 +849,7 @@ const createParams = ({
   return params;
 }
 ```
-#### Creating updated items
+#### Creating Updated Items
 ```js
 const WRONG_PARAMS = 'WRONG_PARAMS';
 
@@ -921,13 +937,13 @@ const createUpdatedItems = ({
   ];
 }
 ```
-## Integrating with template
+## Integrating with ST Flex Web Template
 
-This would entirely depends on how you expose your logic from server out. So in Journey Horizon, we configure a custom API gateway that can receive and process ST Flex transit-json requests. So for the example, we would use ST Flex client sdk to create and update subscription transaction. And to make things easy, we would inject that sdk into ST Flex's sdk when it is created
+This would entirely depend on how you expose your logic from the server out. So in Journey Horizon, we configure a custom API gateway that can receive and process ST Flex transit-json requests. So for the example, we would use ST Flex client SDK to create and update subscription transaction. And to make things easy, we would inject that SDK into ST Flex's SDK when it is created.
 
-### Create sdk instance point to our server
+### Create SDK Instance Point to our Server
 
-You need to find all of the places that ST Flex team initiate their sdk instance inside of the template, the code snippet would usually looks like this
+You need to find all of the places that ST Flex team initiate their SDK instance inside of the template, the code snippet would usually looks like this
 
 ```js
 const sdk = sharetribeSdk.createInstance({
@@ -976,7 +992,7 @@ const jhSdk = sharetribeSdk.createInstance({
 sdk.jh = jhSdk;  
 ```
 
-### Initiate subscription call
+### Initiate Subscription Call
 
 We would re-use Flex's checkout page, modify its logic from
 ```js
@@ -1000,7 +1016,7 @@ const handleSubscriptionCreation = composeAsync(
     );
 ```
 
-#### Saving customer credit card first
+#### Saving Customer Credit Card First
 
 To make it easy, we will copy the logic from `PaymentMethodsPage`
 
@@ -1049,7 +1065,7 @@ const mapDispatchToProps = dispatch => ({
 });
 
 ```
-### Request payment
+### Request Payment
 
 ```js
 const orderParams = {
@@ -1109,13 +1125,13 @@ export const initiateOrder = (orderParams) => (dispatch, getState, sdk) => {
 };
 ```
 
-## Respond to Flex event
+## Respond to Flex Event
 
 These would be ideas for you to extend the base. You can create a transaction on Flex and let your user & operator interact with that transaction then use ST Flex's event query to detect the changes. You can then update the subscription details accordingly
 
 Ex: when creating a subscription, you would also create a transaction on ST Flex and save the Stripe subscription id to the transaction's metadata
 
-## Respond to Stripe event
+## Respond to Stripe Event
 
 Stripe offers webhook which would be helpful for:
 - Detecting user has paid
@@ -1206,7 +1222,7 @@ export const convertObjToCamelCase = obj => {
 }
 ```
 
-### Create ST Flex error object
+### Create ST Flex Error Object
 
 So to make things consistent, we would try to create error message that looks like ST Flex's format
 
@@ -1248,3 +1264,31 @@ const stripe = new Stripe(config.stripe.secret, {
 
 export default stripe;
 ```
+
+# That's a Wrap
+If you have any questions about using the cookbook and find bugs in the code, please reach out to support@journeyhorizon.com or talk to us via the intercom.io chat button on our website www.journeyh.io. Good luck with your marketplace build. 
+
+# TERMS OF USE
+## Commercial-In-Confidence
+The content of this document is Commercial-In-Confidence and covered by Non-Disclosure Agreement.
+
+## Grant of Copyright License. 
+Subject to the terms and conditions of this License, JourneyHorizon Pty Ltd grants to You a perpetual, worldwide, non-exclusive copyright license to reproduce, prepare Derivative Works of, publicly display, and publicly perform in Source or Object form for a single Marketplace built using Sharetribe Flex.
+
+## Charges and Royalties
+Any charges or Royalties associated with this License have been agreed between the JourneyHorizon Pty Ltd and You. Any non-payment of such Charges and Royalties shall terminate this license.
+
+## Redistribution. 
+You may not reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form.
+
+## Assignment.
+You may assign this License as part of any Asset or Company sale to a third-party.
+
+## Trademarks. 
+This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+## Disclaimer of Warranty. 
+Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+## Limitation of Liability
+In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
