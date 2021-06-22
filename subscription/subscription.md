@@ -1022,7 +1022,7 @@ To make it easy, we will copy the logic from `PaymentMethodsPage`
 
 ```js
 //Should be in @handlePaymentIntent function
-const fnSavePaymentMethod = (fnParams) => {
+const fnSavePaymentMethod = async (fnParams) => {
   const { stripe, card, billingDetails } = handlePaymentParams;
 
   const stripeCustomer = ensuredCurrentUser.stripeCustomer;
