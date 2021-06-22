@@ -68,12 +68,15 @@
     - [1.2) Non-functional Requirement](#12-non-functional-requirement)
   - [2. How the cast and the mysterious force behind their back work with each other](#2-how-the-cast-and-the-mysterious-force-behind-their-back-work-with-each-other)
   - [3. The end user](#3-the-end-user)
-- [VI. Software lifecycle](#vi-software-lifecycle)
-  - [1. Waterfall](#1-waterfall)
-  - [2. V-shaped](#2-v-shaped)
-  - [3. Iterative](#3-iterative)
-  - [4. Spiral](#4-spiral)
-  - [5. Agile](#5-agile)
+- [VI. Software terminology](#vi-software-terminology)
+  - [1. Lifecycle](#1-lifecycle)
+    - [1.1) Waterfall](#11-waterfall)
+    - [1.2) V-shaped](#12-v-shaped)
+    - [1.3) Iterative](#13-iterative)
+    - [1.4) Spiral](#14-spiral)
+    - [1.5) Agile](#15-agile)
+  - [2. Traditional Web](#2-traditional-web)
+  - [3. Web app, hybrid web](#3-web-app-hybrid-web)
 - [VII. Whose fault is this?](#vii-whose-fault-is-this)
   - [1. Testing](#1-testing)
   - [2. Reporting the issue](#2-reporting-the-issue)
@@ -194,12 +197,16 @@ Explaining how the back-end and front-end usually work with each other
 
 At the end of this chapter, there would be a test and some exercises.
 
-# VI. Software lifecycle
-## 1. Waterfall
-## 2. V-shaped
-## 3. Iterative
-## 4. Spiral
-## 5. Agile
+# VI. Software terminology
+## 1. Lifecycle
+### 1.1) Waterfall
+### 1.2) V-shaped
+### 1.3) Iterative
+### 1.4) Spiral
+### 1.5) Agile
+
+## 2. Traditional Web
+## 3. Web app, hybrid web
 
 # VII. Whose fault is this?
 Quick talk about testing
