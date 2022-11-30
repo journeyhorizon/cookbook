@@ -1,23 +1,6 @@
-# Flex out Sharetribe Flex payment (Part 1)
+# Adding new payment provider to Sharetribe Flex (Part 1)
 
-Have you ever encounter this situation before in your sharetribe Flex website?
-
-**Customer**: `"I would like to purchase that shiny Nike, please!"`
-
-**Seller**: `"Of course, here you go. That would be $100"`
-
-**Customer**: `"That's too expensive, can you go lower? Maybe $80 or something. It's a used shoes, maybe adding up the socks?"`
-
-**Seller**: `"That's fair, I accepted that"`
-
-`...1 months later`
-
-**Customer**: `"I would like a partial refund, your shoes has problems"`
-
-**Seller**: 
-```
-We would love to, but unfortunately the system does not allow me to do that
-```
+Have you ever encounter the situation where Sharetribe Flex payment system was too limited for your use case? You want to have partial refund, you want to integrate specific payment method that is available widely in your country such as Paypal or you want to add subscription to your existing sites.
 
 After working with more than 30+ marketplaces and prospecting entrepreneur, that is the common situation that we saw occurred when the business is running. 
 
@@ -150,28 +133,23 @@ I will skip the detailed implementation of each system because each deserve it o
 - Our own white-label payment service to add our own logic - Just need to setup a server using your preferred languages, mine was JS so I used `node` and `deno`.
 - An event listener - For easy of use, I would suggest to use `AWS Lambda` or `Google Cloud function` that is wrapped by `Serverless` for ease of coding and deployment.
 
-# Case study
+After implementing the system, everything should works like this:
 
-So how should we go about with this implementation? Let me bring out a case study that we have experience.(The names would be altered for confidential reasons)
+1. There will be multiple checkout page for multiple payment processors: Stripe, Paypal,...etc.
 
-In ancient times, there exist a marketplaces called `Lakers`. The Lakers' marketplace were for buying luxury goods. Each transaction need to process in average $20,000 (Huge). Because of how large the transaction sum is, their `buyer` was skeptical of the site. They would prefer to go over something...more trustworthy such as `Paypal` or wire transfer. 
+2. When a user enter checkout page, depends on the payment method that listing support, we would render the correspond checkout page.
 
-The marketplace owner were having the same trust issue problems, because they worried that the `seller` could just take the money and leave. There are insurances deals in place, but since it's the early stage of the startup, nothing was signed. If there are problems happened, the marketplace owner would need to pay using their own pocket.
+3. If the user choose an external checkout flow (Paypal for example) on the `CheckoutPage.duck` we would use the `external flow booking alias` that you have created for it.
 
-The Lakers was operated by a single person that is juggling between their daily job so the investment upfront was not significant. That's why we suggested for a combination of manual approach with Flex's built-in system:
+4. When our buyer start entering they payment information by either enter their credit card, login to Paypal,...etc. We would create a transaction in pending state that requires an admin approval (by code)
 
-- For `seller` that trust them, then we would let those seller group (let's called it group A) proceed with normal STFlex flow and connect to their Stripe account.
-- For `seller` that do not trust them (Group B). We would let them book to an admin listing to process money, while for the main transaction, we would just use it for showing information. The admin would need to do manual payout.
+5. On the payment processor site, we would have a webhook to fire off success transaction event to our server. When the hook is fired, we would detect what transactions was deemed to be a success. We use Flex integration SDK to update the transaction status and transition it to `confirmed-payment`
 
-The solution was quick to do and at a low cost. The option to book through admin still stay true to the diagram that we gave above. With the `payment service` that we implement was actually `STFLex system itself`. 
+6. The rest would be your normal business flow
 
-After a while (2 years), the `lakers` was gaining attraction, they were building amazing things on top of their Flex sites. And it finally came the day where their sellers and buyers place full trust in them. But as the business grow, their business booking logic also grows:
-- There were vouchers issued by `seller`
-- There were promos issued by `buyer`
-- There were additional negotiation flow
+7. In case there are refund, dispute that requires refund. Depends on if your site has code the refund button or requires the admin to go in the payment processor dashboard and issue the refund. We would also fire another webhook to the server and add refund information to the transaction metadata.
 
-So we started coding for the Lakers, their own payment system. This time, we replace current admin processing with `Stripe` and because we were using our own `Stripe` integration. We don't need the provider to provide their account at first to create booking any more. 
+That should basically it, you have yourself a functional payment system. 
 
-And the best thing is, because of how we separate the concern of system out. STFlex main transaction was just for recording transaction, when the features gone out. We just need to replace the checkout page, all the transaction details page code were the same.
-
-
+**Footer**
+If you have any questions or want to contact us for help and reduce the development time, please feel free to email `tam.vu@journeyh.io`
