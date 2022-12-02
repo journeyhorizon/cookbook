@@ -1,6 +1,6 @@
 # Adding new payment provider to Sharetribe Flex (Part 2) - Payout System
 
-Paying out to the provider is always a vital part in creating a marketplace, because it served big incentive for a provider to join your marketplace. But because Sharetribe Flex is using Stripe, it creates a big technical barrier for provider outside of Stripe's supported countries. For a more up-to-dated list, you can refer to [Stripe's doc](https://stripe.com/docs/connect/custom-accounts#requirements)
+Paying out to the provider is always a vital part in creating a marketplace, because it served big incentive for a provider to join your marketplace. But because Sharetribe Flex is using Stripe, it creates a big technical barrier for provider outside of Stripe's supported countries. For a more up-to-dated list, you can refer to [Stripe's doc](https://stripe.com/docs/connect/custom-accounts#requirements).
 
 Here is the current supported countries in time this articles was written:
 
