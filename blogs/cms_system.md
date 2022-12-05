@@ -121,7 +121,7 @@ The general structure is as simple as that, for a more detailed implementation, 
 2) Setup a container for rendering Prismic component
 3) Change the routes code and point to the newly created container
 4) In the container use [Route Resolver](https://prismic.io/docs/route-resolver) 
-5) When there is a user enter the site using the specified url for `Prismic`, we would parse the remaining URl to `@prismicio/helpers` and get an HTML in returned.
+5) When there is a user enter the site using the specified url for `Prismic`, we would parse the remaining URl to `@prismicio/helpers` and get an HTML in returned. Or alternatively, you can use Prismic `PrismicRichText` to parse the content on the template.
 
 
 If you have re-done your framework in `Next.js` I would also recommend to take a look at Prismic [Slice Machine](https://prismic.io/docs/setup-nextjs). It's a low-code solution for adjusting the content layout accordingly. But this deserve to be in a whole article itself so I would just leave it here.
